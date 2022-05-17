@@ -39,7 +39,7 @@ function _cold_copy {
 }
 
 function _clear_local {
-  find $_LOCAL$_BKUPS -iname "$(hostname)*" -mtime +1 -delete;
+  find $_LOCAL$_BKUPS -iname "$(hostname)*" -mtime +1 -delete
 }
 
 function _backup {
@@ -50,7 +50,7 @@ function _backup {
 
 
 function _snapshot {
-  tar cvfz $_LOCAL$_BKUPS/$_SNPNM \
+  tar --create --verbose --zip --file $_LOCAL$_BKUPS/$_SNPNM \
     --exclude={"/storage","/bin","/boot","/dev","/lib","/lib32","/lib64"} \
     --exclude={"/libx32","lost+found","/media","/mnt","/opt","/proc","/usr"} \
     --exclude={"/root","/run","/sbin","/snap","srv","/sys","/tmp","/var"} \
