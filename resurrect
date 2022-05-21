@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+###  DEBUG          ###########################################################
+#set -u -e -o errtrace -o pipefail
+#trap "echo ""errexit: line $LINENO. Exit code: $?"" >&2" ERR
+#IFS=$'\n\t'
+
+###  DESCRIPTION    ###########################################################
+# A script to resurrect a given command 
+# _minimally tested_
+# JL    ||  May 2022  || V 0.1
+
+source SHARED_VARS      # Generic variables shared across all scripts
+source SHARED_FUNCTIONS # Generic functions shared across all scripts
+
+###  VARIABLES      ###########################################################
+
+_FULL_PATH="$(realpath "${0}")"
+_PATH=${_FULL_PATH%/*}
+_FULL_FN=${_FULL_PATH##*/}
+_FN=${_FULL_FN%.*}
+_logfile="$_LOG_PATH/$_FN.log"
+###  FUNCTIONS      ###########################################################
+
+_write_log() {
+  # run a command $@, write it to a log matching the name of thsi script.
+  "$@" >> "$_logfile"
+}
+
+
+_print_help() {
+  cat <<HEREDOC
+
+Start a command if it's not running.  
+
+Usage:
+  ${_FULL_FN} (command to resurrect)
+
+Options:
+  (no options, call the script without any arguments to see this
+  help text)
+HEREDOC
+}
+
+# Invokes script if it's not up.
+_is_valid_command() {
+   command -v "$1" &>/dev/null || echo "$1" not found in path && exit 1
+}
+
+_is_up() {
+  # test if there's a process matching our query
+  _PROCESS="$*"
+  result=$(ps -ef | grep "$_PROCESS" | grep -v "grep" | grep -v "$0" | wc -l)
+  # run it in the background if it's down.
+  [[ $result -eq 0 ]] &&  eval  "$_PROCESS" & disown
+}
+
+
+###  MAIN           ###########################################################
+
+
+_main() {
+  if [[ -z "$*" ]]
+    then _print_help;
+  fi
+  _write_log echo -e "Script Started >>>> $(date +%y%m%d)"
+  _write_log echo -e "\tParameters called: $@\n"
+  _write_log _is_up "$@"
+  _write_log echo -e "Script complete <<<< $(date +%y%m%d)"
+}
+
+_main "$@"

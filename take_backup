@@ -7,39 +7,42 @@ IFS=$'\n\t'
 
 ###  DESCRIPTION    ###########################################################
 # backup $HOME, and /etc to a cloud provider  to be run as root
-# Depends on `rclone`: 
+# Depends on `rclone`:
 #   curl https://rclone.org/install.sh | sudo bash
 ###  VARIABLES      ###########################################################
+source SHARED_VARS      # Generic variables shared across all scripts
+source SHARED_FUNCTIONS # Generic functions shared across all scripts
+
+###  VARIABLES      ###########################################################
+
 
 _FULL_PATH="$(realpath "${0}")"
-_PATH=${_FULL_PATH%/*}
 _FULL_FN=${_FULL_PATH##*/}
-_EXT=${_FULL_FN##*.}
 _FN=${_FULL_FN%.*}
-_logfile=$_PATH/$_FN.log
+_logfile="$_LOG_PATH/$_FN.log"
 
-_HSTNM=$(hostname)
-_DTSTR=$(date +%y%m%d-%H)
-_LOCAL="/storage/" # where do you want the backup saving?
-_BKUPS="backups"   # backup directory name
-_PRMRY="pcloud"    # primary cloud provider (hot backup)
-_SCNDY="google"    # secondary cloud provider (cold backup)
-_SNPNM="$_HSTNM-$_DTSTR.tar.gz" # snapshot name
+_SNPNM="$_HOSTNAME-$_DATE_STR.tar.gz" # snapshot name
 
 ###  FUNCTIONS      ###########################################################
 
+_write_log() {
+  # run a command $@, write it to a log matching the name of this script.
+  "$@" >> "$_logfile"
+}
+
+
 function _hot_copy {
-  rclone copy   -v $_LOCAL$_BKUPS/ $_PRMRY:$_BKUPS
-  rclone delete -v --min-age 2d    $_PRMRY:$_BKUPS --include $_HSTNM
+  rclone copy   -v "$_BACKUP_PATH"/ $_PRIMARY_CLOUD:$_BACKUP_PATH
+  rclone delete -v --min-age 2d    "$_PRIMARY_CLOUD:$_BACKUP_PATH" --include "$_HOSTNAME"
 }
 
 function _cold_copy {
-  rclone copy   -v $_LOCAL$_BKUPS/ $_SCNDY:$_BKUPS
-  rclone delete -v --min-age 14d   $_SCNDY:$_BKUPS --include $_HSTNM
+  rclone copy   -v "$_BACKUP_PATH"/ "$_SECONDARY_CLOUD:$_BACKUP_PATH"
+  rclone delete -v --min-age 14d   "$_SECONDARY_CLOUD:$_BACKUP_PATH" --include "$_HOSTNAME"
 }
 
 function _clear_local {
-  find $_LOCAL$_BKUPS -iname "$(hostname)*" -mtime +1 -delete
+  find $_BACKUP_PATH -iname "$(hostname)*" -mtime +1 -delete
 }
 
 function _backup {
@@ -50,8 +53,8 @@ function _backup {
 
 
 function _snapshot {
-  tar --create --verbose --zip --file $_LOCAL$_BKUPS/$_SNPNM \
-    --exclude={"/storage","/bin","/boot","/dev","/lib","/lib32","/lib64"} \
+  tar cvzf  "$_BACKUP_PATH/$_SNPNM" \
+    --exclude={"$_BACKUP_PATH","/storage","/bin","/boot","/dev","/lib","/lib32","/lib64"} \
     --exclude={"/libx32","lost+found","/media","/mnt","/opt","/proc","/usr"} \
     --exclude={"/root","/run","/sbin","/snap","srv","/sys","/tmp","/var"} \
     --exclude={"*ropbox*","Downloads",".cache",".mozilla",".vscode",".local"} \

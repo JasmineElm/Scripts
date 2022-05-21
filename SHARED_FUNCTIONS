@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+source SHARED_VARS
+
+
+_SETUP() {
+  # create directories etc
+  # assume everything needs sudo
+  [[ -d "$_BACKUP_DIR" ]] || sudo mkdir "$_BACKUP_DIR"
+  [[ -d "$_LOG_DIR" ]] || sudo mkdir "$_LOG_DIR"
+
+}

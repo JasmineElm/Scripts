@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+###  DEBUG          ###########################################################
+set -u -e -o errtrace -o pipefail
+trap "echo ""errexit: line $LINENO. Exit code: $?"" >&2" ERR
+IFS=$'\n\t'
+
+###  DESCRIPTION    ###########################################################
+# A script to list all manuall installed apt apps.
+# _minimally tested_
+# JL    ||  May 2022  || V 0.1
+
+# apt install "$( cat $_APT_LIST )"
+
+source SHARED_VARS      # Generic variables shared across all scripts
+source SHARED_FUNCTIONS # Generic functions shared across all scripts
+###  VARIABLES      ###########################################################
+
+_FULL_PATH="$(realpath "${0}")"
+_FULL_FN=${_FULL_PATH##*/}
+_FN=${_FULL_FN%.*}
+_logfile="$_LOG_PATH/$_FN.log"
+_WHOAMI="$(whoami)"
+_HOSTNAME="$(hostname)"
+_APT_LIST="$_BACKUP_PATH/apt_list_-_$_WHOAMI@$_HOSTNAME"
+
+###  FUNCTIONS      ###########################################################
+
+_write_log() {
+  # run a command $@, write it to a log matching the name of this script.
+  "$@" >> "$_logfile"
+}
+
+_list_installed() {
+  # list manually installed apps
+  apt list --installed | grep -F \[installed\] | cut -d'/' -f 1
+}
+
+###  MAIN           ###########################################################
+
+
+_main() {
+              _write_log echo -e "Script Started >>>> $(date +%y%m%d)\n\n"
+              _write_log _list_installed > "$_APT_LIST"
+              _write_log echo -e "Script complete >>>> $(date +%y%m%d)\n\n"
+}
+
+_main "$@"

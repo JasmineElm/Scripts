@@ -1,0 +1,20 @@
+#### SHARED VARIABLES
+
+# WHO, WHAT, WHERE, WHEN
+#
+
+_WHOAMI="$(whoami)"
+_HOSTNAME="$(hostname)"
+_DATE_STR="$(date +%y%m%d-%H)"
+
+## Logging
+
+_LOG_PATH="/home/$_WHOAMI/.logs"
+_BACKUP_PATH="/backups"
+
+## Cloud Services
+# (values should match entries in rclone)
+#
+_PRIMARY_CLOUD="pcloud"
+_SECONDARY_CLOUD="google"
+_TERTIARY_COOUD="box"
