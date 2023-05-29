@@ -10,7 +10,7 @@ _DATE_STR="$(date +%y%m%d-%H)"
 ## Logging
 
 _LOG_PATH="/home/$_WHOAMI/.logs"
-_BACKUP_PATH="/backups"
+_BACKUP_PATH="/backup"
 
 ## Cloud Services
 # (values should match entries in rclone)

@@ -5,44 +5,116 @@ set -u -e -o errtrace -o pipefail
 trap "echo ""errexit: line $LINENO. Exit code: $?"" >&2" ERR
 IFS=$'\n\t'
 
-###  DESCRIPTION    ###########################################################
-# A script to list all manuall installed apt apps.
-# _minimally tested_
-# JL    ||  May 2022  || V 0.1
-
-# apt install "$( cat $_APT_LIST )"
-
-source SHARED_VARS      # Generic variables shared across all scripts
-source SHARED_FUNCTIONS # Generic functions shared across all scripts
 ###  VARIABLES      ###########################################################
+# source SHARED_FUNCTIONS and SHARED_VARS
+# shellcheck source=SHARED_FUNCTIONS
+source SHARED_FUNCTIONS
+# shellcheck source=SHARED_VARS
+source SHARED_VARS
 
-_FULL_PATH="$(realpath "${0}")"
-_FULL_FN=${_FULL_PATH##*/}
-_FN=${_FULL_FN%.*}
-_logfile="$_LOG_PATH/$_FN.log"
-_WHOAMI="$(whoami)"
-_HOSTNAME="$(hostname)"
-_APT_LIST="$_BACKUP_PATH/apt_list_-_$_WHOAMI@$_HOSTNAME"
-
+_INSTALL_LOG=/var/log/apt/history.log
+_MACHINE="$(whoami)@$(hostname)"
+_INSTALL_LIST="$_BACKUP_PATH/install_$_MACHINE"
+_REMOVE_LIST="$_BACKUP_PATH/remove_$_MACHINE"
+#use tput for bold, colors, etc
+_bld=$(tput bold)
+_nrm=$(tput sgr0)
 ###  FUNCTIONS      ###########################################################
 
-_write_log() {
-  # run a command $@, write it to a log matching the name of this script.
-  "$@" >> "$_logfile"
+_test_gz_logs() {
+  # test if there are any gzipped logs
+  stat -t "$_INSTALL_LOG*.gz" > /dev/null 2>&1
+}
+
+_get_log_files() {
+  local _tmp_file
+  _tmp_file=$(mktemp)
+  if _test_gz_logs; then
+      cat "$_INSTALL_LOG"*.gz > "$_tmp_file"
+  fi
+  cat "$_INSTALL_LOG" >> "$_tmp_file"
+  cat "$_tmp_file"
+  rm "$_tmp_file"
+}
+
+_format_apt_list() {
+  echo "$1" | tr ' ' '\n' | sort -u | grep -vP '^\./.*$' | grep -vP '^-'
 }
 
 _list_installed() {
-  # list manually installed apps
-  apt list --installed | grep -F \[installed\] | cut -d'/' -f 1
+  all=$(_get_log_files)
+  filtered=$(echo "$all" |grep -oP '(?<=Commandline: apt install ).*')
+  _format_apt_list "$filtered"
+}
+
+_list_removed() {
+  all=$(_get_log_files)
+  filtered=$(echo "$all" |grep -oP '(?<=Commandline: apt remove ).*')
+  _format_apt_list "$filtered"
+}
+
+_compare_lists() {
+  list1="$1"
+  list2="$2"
+  echo "$list1" | grep -vFxf <(echo "$list2")
+}
+
+_install_from_list() {
+  # install packages from a list
+  xargs -a "$1" sudo apt install
+}
+_generate_lists() {
+  installed=$(_list_installed)
+  removed=$(_list_removed)
+  to_install=$(_compare_lists "$installed" "$removed")
+  to_remove=$(_compare_lists "$removed" "$installed")
+  echo "$to_remove" > "$_REMOVE_LIST"
+  echo "$to_install" > "$_INSTALL_LIST"
+}
+
+
+_remove_from_list() {
+  # remove packages & dependencies from a list
+  xargs -a "$1" sudo apt remove && \
+    sudo apt autoremove --purge -y
+}
+
+_usage() {
+  cat << HEREDOC
+usage: $0 [-g] [-i <list>] [-r <list>]
+  $_bld-g$_nrm: generate lists (default)
+  $_bld-i$_nrm: install from list <list>
+  $_bld-r$_nrm: remove from list <list>
+HEREDOC
+}
+
+_parse_args() {
+  # parse arguments
+  while getopts "hgi:r:" opt; do
+    case "$opt" in
+      g)
+        _generate_lists
+        ;;
+      i)
+        shift 1
+        _install_from_list "$1"
+        ;;
+      r)
+        shift 1
+        _remove_from_list "$1"
+        ;;
+      h)
+        _usage
+        exit 1
+        ;;
+      *)
+        _usage
+        exit 1
+        ;;
+    esac
+  done
 }
 
 ###  MAIN           ###########################################################
-
-
-_main() {
-              _write_log echo -e "Script Started >>>> $(date +%y%m%d)\n\n"
-              _write_log _list_installed > "$_APT_LIST"
-              _write_log echo -e "Script complete >>>> $(date +%y%m%d)\n\n"
-}
-
-_main "$@"
+_parse_args "$@"
+# remove any temp files
